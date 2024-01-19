@@ -1,4 +1,4 @@
-import { Component } from "react";
+import { useEffect, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer, toast } from "react-toastify";
 
@@ -9,114 +9,82 @@ import Button from "./components/Button/Button";
 import Loader from "./components/Loader";
 import Modal from "./components/Modal/Modal";
 
-class App extends Component {
-  state = {
-    query: "",
-    page: 1,
-    totalHits: 0,
-    collection: [],
-    isDisable: false,
-    isPreLoading: false,
-    modalShown: false,
-    biggerImageUrl: "",
-    alt: "",
-  };
+function App() {
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [collection, setCollection] = useState([]);
+  const [isDisable, setIsDisable] = useState(false);
+  const [isPreLoading, setIsPreLoading] = useState(false);
+  const [modalShown, setModalShown] = useState(false);
+  const [biggerImageUrl, setBiggerImageUrl] = useState("");
+  const [alt, setAlt] = useState("");
 
-  toastOptions = {
-    position: "top-right",
-    autoClose: 2500,
-    closeOnClick: true,
-    theme: "colored",
-  };
+  useEffect(() => {
+    const toastOptions = {
+      position: "top-right",
+      autoClose: 2500,
+      closeOnClick: true,
+      theme: "colored",
+    };
 
-  componentDidUpdate(_, prevState) {
-    const { query: prevName, page: prevPage } = prevState;
-    const {
-      query: nextName,
-      page: currPage,
-      collection,
-      totalHits: totalLength,
-    } = this.state;
+    if (query === "") return;
 
-    if (prevName !== nextName || prevPage !== currPage) {
-      api
-        .fetchImage(nextName, currPage)
-        .then(({ hits, totalHits }) => {
-          this.setState((prevState) => ({
-            isDisable: false,
-            totalHits,
-            collection:
-              prevName === nextName ? [...prevState.collection, ...hits] : hits,
-          }));
+    api
+      .fetchImage(query, page)
+      .then(({ hits, totalHits }) => {
+        if (hits.length < 12 || totalHits / page < 12) {
+          setIsDisable(true);
+          toast.success("Вы просмотрели все изображения по данному запросу");
+        }
+        setIsPreLoading(true);
+        setCollection((prev) => [...prev, ...hits]);
+      })
+      .catch((err) => {
+        toast.error(`Ошибка- ${err}`, toastOptions);
+      })
+      .finally(() => setIsPreLoading(false));
+  }, [query, page]);
 
-          if (collection.length >= totalLength && collection.length !== 0) {
-            toast.success("Вы просмотрели все картинки", this.toastOptions);
-            this.setState({ isDisable: true });
-          }
-        })
-        .catch((err) => {
-          toast.error(`Ошибка- ${err}`, this.toastOptions);
-        })
-        .finally(this.setState({ isPreLoading: false }));
+  const handleFormSubmit = (queryValue) => {
+    if (query === queryValue || queryValue === "") {
+      return;
     }
-  }
 
-  handleFormSubmit = (query) => {
-    if (query !== this.state.query) {
-      if (query.trim() === "") return;
-      this.setState({ query, page: 1, collection: [], isPreLoading: true });
-    } else {
-      this.setState((prevState) => ({
-        collection: prevState.collection,
-      }));
-    }
+    setCollection([]);
+    setPage(1);
+    setQuery(queryValue);
+    setIsDisable(false);
   };
 
-  onLoadMore = () => {
-    this.setState((prevState) => ({
-      page: prevState.page + 1,
-      isPreLoading: true,
-    }));
+  const onLoadMore = () => {
+    setPage((page) => page + 1);
+    setIsPreLoading(true);
   };
 
-  toggleModal = () => {
-    this.setState({ modalShown: !this.state.modalShown });
+  const openModal = ({ src, alt }) => {
+    setBiggerImageUrl(src);
+    setAlt(alt);
+    setModalShown((prev) => !prev);
   };
 
-  openModal = (e) => {
-    this.setState({
-      biggerImageUrl: e.currentTarget.src,
-      alt: e.target.alt,
-    });
-    this.toggleModal();
-  };
-
-  render() {
-    const {
-      collection,
-      isDisable,
-      totalHits,
-      isPreLoading,
-      modalShown,
-      biggerImageUrl,
-      alt,
-    } = this.state;
-
-    return (
-      <div className="App">
-        <SearchBar onSubmit={this.handleFormSubmit} />
-        {totalHits > 0 && <ToastContainer />}
-        <ImageGallery images={collection} openModal={this.openModal} />
-        <Loader isPreloading={isPreLoading} />
-        {collection.length > 0 && (
-          <Button onLoadMore={this.onLoadMore} isDisable={isDisable} />
-        )}
-        {modalShown && (
-          <Modal onClose={this.toggleModal} src={biggerImageUrl} alt={alt} />
-        )}
-      </div>
-    );
-  }
+  return (
+    <div className="App">
+      <SearchBar onSubmit={handleFormSubmit} />
+      {collection.length > 0 && <ToastContainer />}
+      <ImageGallery images={collection} openModal={openModal} />
+      <Loader isPreloading={isPreLoading} />
+      {collection.length > 0 && !isDisable && (
+        <Button onLoadMore={onLoadMore} isDisable={isDisable} />
+      )}
+      {modalShown && (
+        <Modal
+          src={biggerImageUrl}
+          alt={alt}
+          onClose={() => setModalShown((prev) => !prev)}
+        />
+      )}
+    </div>
+  );
 }
 
 export default App;

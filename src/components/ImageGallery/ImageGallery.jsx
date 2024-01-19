@@ -5,7 +5,11 @@ const ImageGallery = ({ images, openModal }) => {
     <ul className="ImageGallery">
       {images &&
         images.map((item) => (
-          <ImageGalleryItem image={item} key={item.id} openModal={openModal} />
+          <ImageGalleryItem
+            image={item}
+            key={item.webformatURL}
+            openModal={openModal}
+          />
         ))}
     </ul>
   );
